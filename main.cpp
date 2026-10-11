@@ -1,122 +1,100 @@
 #include <iostream>
-#include <deque>
-#include <random>
-#include <thread>
-#include <chrono>
+#include <iomanip>
+#include <string>
+#include <vector>
+#include <stack>
+#include <regex>
 #include <cctype>
-#include <conio.h>
-using namespace std; //big nono for some reason
-const int sz = 20;
-char game[sz][sz];
-int length = 1; // player length
-string playerDir = "down";
-pair<int,int> head(0,0); //snake head
-deque<pair<int,int>> q; //fifo queue for snake logic
-bool playing = true; //for stopping behavior
-pair<int,int> nxt;
-pair<int,int> apple;
-random_device rd; 
-mt19937 gen(rd()); 
-uniform_int_distribution<int> distrib(0, sz-1); 
-bool won = false;
-void display(){
-    cout << "\x1B[H";
-    for (int i = 0; i < sz; i++){
-        for (int j = 0; j < sz; j++){
-            if (game[i][j] == '#') cout << "\033[32m";
-            else if (game[i][j] == 'A') cout << "\033[31m";
-            cout << game[i][j] << " " << "\033[0m";
-        }
-        cout << '\n';
-    }
-}
-void checkMove(){
-    while (_kbhit()) {
-        char ch = _getch();
-        ch = tolower(ch);
-        if (ch == 'w' && playerDir != "down")playerDir = "up";
-        else if (ch == 'a' && playerDir != "right") playerDir = "left";
-        else if (ch == 's' && playerDir != "up") playerDir = "down";
-        else if (ch == 'd' && playerDir != "left") playerDir = "right";
-    }
-}
-//to make code more intuitive
-void die(){
-    playing = false;
-    return;
-}
-void generateApple(){
-    bool insideSnake = true; //prevent apple from spawning in snake
-    while (insideSnake){
-        apple.first = distrib(gen);
-        apple.second = distrib(gen);
-        insideSnake = false;
-        for (const auto& p : q){
-            if (apple == p){
-                insideSnake = true;
+#include <chrono> 
+using db = double;
+using namespace std;
+//tokenize expression
+vector<string> tokenizeExp(string str) {
+    vector<string> tokens;
+    regex r(R"([0-9.+*/()\- \t\r\n]+)");
+    if (!regex_match(str, r)) return {};
+    string temp;
+    for (char c : str) {
+        if (isspace(static_cast<unsigned char>(c))) continue;
+        if (isdigit(static_cast<unsigned char>(c)) || c == '.') {
+            temp += c;
+        } else {
+            if (!temp.empty()) {
+                tokens.push_back(temp);
+                temp.clear();
             }
+            tokens.push_back(string(1, c));
         }
     }
-    game[apple.first][apple.second] = 'A';
+    if (!temp.empty()) tokens.push_back(temp);
+    return tokens;
 }
-void loop(){
-    if (length >= sz * sz){
-        won = true;
-        die();
-        return;
-    }
-    checkMove();
-    //simulate next move before doing
-    nxt = head;
-    if (playerDir == "down") nxt.first++;
-    else if (playerDir == "up") nxt.first--;
-    else if (playerDir == "left") nxt.second--;
-    else if (playerDir == "right") nxt.second++;
-    //self intersection
-    for (const auto& p : q){
-        if (nxt == p){
-            die();
-            return;
-        }
-    }
-    if (nxt == apple){
-        generateApple();
-        length++;
-    }
-    //escape behavior
-    if (nxt.first >= sz || nxt.first <= -1 || nxt.second >= sz || nxt.second <= -1){
-        die();
-        return;
-    }
-    head = nxt;
-    //snake behavior
-    q.push_back(head);
-    game[head.first][head.second] = '#';
-    while (q.size() > length){
-        pair<int,int> removed = q.front();
-        q.pop_front();
-        game[removed.first][removed.second] = '.';
-    }
-    display();
+//helper function
+int prec(string s) {
+    if (s == "*" || s == "/") return 2;
+    if (s == "+" || s == "-") return 1;
+    return 0;
 }
-void initGame(){
-    for (int i = 0; i < sz; i++){
-        for (int j = 0; j < sz; j++){
-            game[i][j] = '.';
+//infix to postfix
+vector<string> convPfix(vector<string> tokens){
+    stack<string> op;
+    vector<string> output;
+    for (string token : tokens){
+        if (isdigit(token[0]) || token[0] == '.'){
+            output.push_back(token);
+        }
+        else if (token == "("){
+            op.push(token);
+        }
+        else if (token == ")"){
+            while (!op.empty() && op.top() != "("){
+                output.push_back(op.top());
+                op.pop();
+            }
+            op.pop();
+        }
+        else {
+            while (!op.empty() && (prec(op.top()) >= prec(token))){
+                output.push_back(op.top());
+                op.pop();
+            }
+            op.push(token);
         }
     }
-    q.push_back(head);
-    generateApple();
+    while (!op.empty()){
+        output.push_back(op.top());
+        op.pop();
+    }
+    return output;
+}
+db evalPfix(vector<string> tokens){
+    stack<db> s;
+    for (string token : tokens){
+        if (isdigit(token[0]) || token[0] == '.'){
+            s.push(stod(token));
+        }
+        else {
+            db y = s.top(); s.pop();
+            db x = s.top(); s.pop();
+            if (token == "+") s.push(x + y);
+            else if (token == "-") s.push(x - y);
+            else if (token == "*") s.push(x * y);
+            else if (token == "/") s.push(x / y); 
+        }
+    }
+    return s.top();
 }
 int main(){
-    cout << "\x1B[2J" << "\033[?25l";;
-    initGame();
-    while (playing){
-        loop();
-        this_thread::sleep_for(chrono::milliseconds(100));
+    cout << "Calculator: Basic operations (+,-,*,/) with parentheses" << '\n' << "(doesnt check for errors or negative numbers bc i'm not coding allat)" << '\n';
+    while (true){
+        cout << "Enter your Expression: ";
+        string exp;
+        getline(cin,exp);
+        auto start = chrono::high_resolution_clock::now();
+        cout << setprecision(15) << evalPfix(convPfix(tokenizeExp(exp))) << '\n';
+        auto stop = chrono::high_resolution_clock::now();
+        auto duration = chrono::duration_cast<chrono::microseconds>(stop - start);
+        cout << "Calculated in " << duration.count() << " microseconds" << '\n';
     }
-    cout << "\x1B[2J";
-    if (won) cout << "You win!";
-    cout << "Game over! Your length was: " << length;
     return 0;
 }
