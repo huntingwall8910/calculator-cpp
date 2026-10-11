@@ -1,6 +1,6 @@
 # basic calculator
 
-basic operators with parenthesis and no negatives
+basic operators with parentheses and no negatives
 
 also no error catching
 
